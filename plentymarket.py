@@ -1,16 +1,13 @@
 import requests
 import json
-import pandas as pd
 from urllib.parse import urlencode
+
+DEFAULT_URL = "https://www.plentymarkets.co.uk/rest/"
+
 
 class PlentyMarketRestClient():
 
-    def __init__(self, api_url="https://www.plentymarkets.co.uk/rest/"):
-        """
-        Initializes class variables
-
-        :param str api_url: plentymarket API URL
-        """
+    def __init__(self, api_url=DEFAULT_URL):
         self._access_token = ""
         self._refresh_token = ""
         self._url = api_url
@@ -19,65 +16,31 @@ class PlentyMarketRestClient():
         self._last_request_content = None
         self._token_expiration = 0
 
-
     def setHeader(self, header):
-        """
-        Updates class variable headers with header dict.
-        Overwrites existing keys.
-
-        :param dict header: headers to update
-        """
         self._headers.update(header)
-    
-    def getDataFrame(self):
-        """
-        Returns DataFrame object from last request data
-        """
-        if self._last_request_content:
-            data = self._last_request_content.decode()
-            data = json.loads(data)
-            df = pd.DataFrame.from_dict(data, orient="index")
-            return df
-        
-        print("No data found!")
-        return None
 
     def getHeaders(self):
-        """
-        Returns class variable headers
-        """
         return self._headers
-    
 
     def getLastRequestContent(self):
-        """
-        Returns last request content.
-        """
         return self._last_request_content
-    
 
     def setLastRequestContent(self, content):
-        """
-        Sets last request content. (Usually called by decorator _safeQuery)
-        """
         self._last_request_content = content
 
-    
     def setLastStatusCode(self, status_code):
         """
         Sets last response's status code. (Usually called by decorator _safeQuery)
         """
         self._last_request_status_code = status_code
 
-
     def login(self, email, password, id=0):
         """
         Logins to plentymarket using email and password.
         Posts requests to login API endpoint.
-        
+
         :param str email: plentymarkets email
         :param str password: plentymarkets password
-
         :return: Returns response
         :rtype: Response Object
         """
@@ -85,7 +48,7 @@ class PlentyMarketRestClient():
             "email": email,
             "password": password,
             "id": id
-            }
+        }
         url = self._url + "account/login"
         response = requests.post(url, json=data)
 
@@ -102,21 +65,19 @@ class PlentyMarketRestClient():
             print("Error: Could not login. invalid credentials or API endpoint")
 
         return response
-    
 
     def refreshLogin(self):
         """
-        NOTE: Incomplete method and may not work properly, because of unknown response!
+        NOTE: Incomplete method and may not work properly!
+        Refresh login using refresh token.
 
-        Refresh login using refresh token
-        
         :return: Returns response
         :rtype: Response Object
         """
         url = self._url + "account/login/refresh"
         response = requests.post(url, headers=self._headers)
 
-        data = response.text
+        data = json.loads(response.text)
         if "refreshToken" in data:
             self._refresh_token = data["refreshToken"]
         return response
@@ -124,9 +85,7 @@ class PlentyMarketRestClient():
     def _safeQuery(func):
         """
         Decorator: Checks for valid request and response.
-
         :param function func: function to apply the decorator to
-
         :return: Returns wrapper function.
         :rtype: function
         """
@@ -140,13 +99,13 @@ class PlentyMarketRestClient():
                     if response.status_code == 401:
                         print("Unauthorized: expired or invalid access token.")
                         self.safeQuery(self, func)
-                    
-                    if response.status_code == 200:
+
+                    elif response.status_code == 200:
                         self.setLastRequestContent(response.content)
 
-                    if response.status_code == 404:
+                    elif response.status_code == 404:
                         raise("HTTP 404 Error, unvalid API endpoint")
-                    
+
                     return response
 
                 except Exception as e:
@@ -167,44 +126,34 @@ class PlentyMarketRestClient():
                     print("Error: " + str(e))
 
         return wrapper
-    
 
     @_safeQuery
     def post(self, api_endpoint, data={}):
         """
         Executes POST request to plentymarket API endpoint
-
         :param str api_endpoint: API endpoint (e.g: payment/properties/types/names)
         :param dict data: required data to execute request
-
         :return: Returns HTTP response
         :rtype: Response Object
         """
-        response = requets.post(self._url + api_endpoint, data=data, headers=self._headers)
-
-        return response
+        return requests.post(self._url + api_endpoint, data=data, headers=self._headers)
 
     @_safeQuery
     def delete(self, api_endpoint):
         """
         Executes DELETE request to plentymarket API endpoint
         :param str api_endpoint: API endpoint (e.g: /rest/languages/translations/{translationId})
-
         :return: Returns HTTP response
         :rtype: Response Object
         """
-        response = requests.delete(self._url + api_endpoint)
-
-        return response
+        return requests.delete(self._url + api_endpoint)
 
     @_safeQuery
     def get(self, api_endpoint, data={}):
         """
         Executes GET request to plentymarket API endpoint
-
         :param str api_endpoint: API endpoint (e.g: pim/attributes)
         :param dict data: required data to execute request
-
         :return: Returns HTTP response
         :rtype: Response Object
         """
@@ -212,28 +161,15 @@ class PlentyMarketRestClient():
         if api_endpoint[:-1] != "?":
             query = "?" + query
         url = self._url + api_endpoint + query
-        response = requests.get(url, headers=self._headers)
-
-        return response
+        return requests.get(url, headers=self._headers)
 
     @_safeQuery
     def put(self, api_endpoint, data={}):
         """
         Executes PUT request to plentymarket API endpoint
-
         :param str api_endpoint: API endpoint (e.g: plugin_sets/{setId}/plugins/{pluginId})
         :param dict data: required data to execute request
-
         :return: Returns HTTP response
         :rtype: Response Object
         """
-        url = self._url + api_endpoint
-        response = requests.put(url, data=data)
-
-        return response
-
-
-
-
-
-
+        return requests.put(self._url + api_endpoint, data=data)
